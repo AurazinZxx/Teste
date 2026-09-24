@@ -1,0 +1,29 @@
+name: PC criado pelo @alves7.pcm
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-rdp:
+    runs-on: windows-latest
+    steps:
+      - name: Enable RDP
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          net user runneradmin "P@ssw0rd!"
+
+      - name: Fast Tailscale & IP
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi" -OutFile "$env:TEMP\ts.msi"
+          Start-Process msiexec.exe -ArgumentList "/i `"$env:TEMP\ts.msi`" /quiet /norestart" -Wait
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey ${{ secrets.TAILSCALE_AUTH_KEY }} --hostname "enigmano-${{ github.run_id }}"
+          $tsIP = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          Write-Host "Tailscale IP: $tsIP"
+          Write-Host "::notice title=TAILSCALE_IP::$tsIP"
+
+      - name: Keep Alive
+        run: |
+          while ($true) { Start-Sleep -Seconds 60 }
+          
