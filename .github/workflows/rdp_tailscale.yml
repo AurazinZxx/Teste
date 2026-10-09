@@ -26,4 +26,3 @@ jobs:
       - name: Keep Alive
         run: |
           while ($true) { Start-Sleep -Seconds 60 }
-          
