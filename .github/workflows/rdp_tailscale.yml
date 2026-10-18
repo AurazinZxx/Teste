@@ -6,47 +6,34 @@ on:
 jobs:
   deploy-rdp:
     runs-on: windows-latest
-
     steps:
-      - name: Enable RDP
-        shell: pwsh
+      - name: Enable RDP & Setup User
         run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name 'fDenyTSConnections' -Value 0
-          Enable-NetFirewallRule -DisplayGroup 'Remote Desktop'
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          
+          # Cria apenas o usuario Admin para conexao RDP
+          net user Admin "P@ssw0rd1234!" /add
+          net localgroup Administrators Admin /add
 
       - name: Fast Tailscale & IP
-        shell: pwsh
         env:
           TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
         run: |
           $msiPath = "$env:TEMP\ts.msi"
-          curl.exe -fSsL 'https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi' -o $msiPath
-
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Falha ao baixar o instalador do Tailscale.'
-          }
-
-          $arguments = "/i `"$msiPath`" /qn /norestart TS_UNATTENDEDMODE=always TS_NOLAUNCH=true"
-          Start-Process msiexec.exe -ArgumentList $arguments -Wait
-
+          curl.exe -sSL "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi" -o $msiPath
+          Start-Process msiexec.exe -ArgumentList "/i `"$msiPath`" /qn /norestart TS_UNATTENDEDMODE=always TS_NOLAUNCH=true" -Wait
+          
           Start-Service Tailscale -ErrorAction SilentlyContinue
           Start-Sleep -Seconds 3
 
-          $tailscale = 'C:\Program Files\Tailscale\tailscale.exe'
-          & $tailscale up "--authkey=$env:TAILSCALE_AUTH_KEY" "--hostname=enigm ano-$env:GITHUB_RUN_ID".Replace(' ', '') --unattended
-
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Falha ao conectar o Tailscale.'
-          }
-
-          $tsIP = & $tailscale ip -4
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey "$env:TAILSCALE_AUTH_KEY" --hostname "enigmano-$env:GITHUB_RUN_ID" --unattended
+          
+          $tsIP = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
           Write-Host "Tailscale IP: $tsIP"
           Write-Host "::notice title=TAILSCALE_IP::$tsIP"
 
       - name: Keep Alive
-        shell: pwsh
         run: |
-          while ($true) {
-            Start-Sleep -Seconds 60
-          }
+          while ($true) { Start-Sleep -Seconds 60 }
           
